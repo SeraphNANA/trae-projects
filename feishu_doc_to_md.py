@@ -54,6 +54,24 @@ def get_document_content(document_token, access_token):
         print(f"响应内容: {response.text if 'response' in locals() else '无响应'}")
         return None
 
+def extract_text(block):
+    """从块中提取文本"""
+    # 检查各种可能的文本字段
+    text_fields = [
+        "heading1", "heading2", "heading3", "heading4", "heading5", "heading6",
+        "text", "bullet", "ordered", "page"
+    ]
+    
+    for field in text_fields:
+        if field in block:
+            elements = block[field].get("elements", [])
+            text = ""
+            for elem in elements:
+                if "text_run" in elem:
+                    text += elem["text_run"].get("content", "")
+            return text
+    return ""
+
 def convert_to_markdown(content):
     """将飞书文档内容转换为Markdown格式"""
     if not content:
@@ -62,95 +80,51 @@ def convert_to_markdown(content):
     markdown = ""
     
     # 处理文档内容
-    if "blocks" in content:
-        for block in content["blocks"]:
-            block_type = block.get("type")
+    if "items" in content:
+        for block in content["items"]:
+            block_type = block.get("block_type")
             
-            if block_type == "heading":  # 标题
-                level = block.get("heading", {}).get("level", 1)
-                # 处理标题文本
-                text = ""
-                if "elements" in block.get("heading", {}):
-                    for elem in block["heading"]["elements"]:
-                        if elem.get("type") == "text_run":
-                            text += elem.get("text", "")
-                markdown += f"{'#' * level} {text}\n\n"
+            if block_type == 1:  # 标题1
+                text = extract_text(block)
+                markdown += f"# {text}\n\n"
                 
-            elif block_type == "paragraph":  # 段落
-                # 处理段落文本
-                text = ""
-                if "elements" in block:
-                    for elem in block["elements"]:
-                        if elem.get("type") == "text_run":
-                            text += elem.get("text", "")
+            elif block_type == 2:  # 段落
+                text = extract_text(block)
                 markdown += f"{text}\n\n"
                 
-            elif block_type == "bulleted_list":  # 无序列表
-                if "items" in block:
-                    for item in block["items"]:
-                        # 处理列表项文本
-                        item_text = ""
-                        if "blocks" in item:
-                            for item_block in item["blocks"]:
-                                if item_block.get("type") == "paragraph" and "elements" in item_block:
-                                    for elem in item_block["elements"]:
-                                        if elem.get("type") == "text_run":
-                                            item_text += elem.get("text", "")
-                        markdown += f"- {item_text}\n"
-                    markdown += "\n"
+            elif block_type == 3:  # 标题2
+                text = extract_text(block)
+                markdown += f"## {text}\n\n"
                 
-            elif block_type == "numbered_list":  # 有序列表
-                if "items" in block:
-                    for i, item in enumerate(block["items"], 1):
-                        # 处理列表项文本
-                        item_text = ""
-                        if "blocks" in item:
-                            for item_block in item["blocks"]:
-                                if item_block.get("type") == "paragraph" and "elements" in item_block:
-                                    for elem in item_block["elements"]:
-                                        if elem.get("type") == "text_run":
-                                            item_text += elem.get("text", "")
-                        markdown += f"{i}. {item_text}\n"
-                    markdown += "\n"
+            elif block_type == 4:  # 标题3
+                text = extract_text(block)
+                markdown += f"### {text}\n\n"
                 
-            elif block_type == "table":  # 表格
-                if "table_rows" in block:
-                    rows = []
-                    for table_row in block["table_rows"]:
-                        row_cells = []
-                        if "cells" in table_row:
-                            for cell in table_row["cells"]:
-                                # 处理单元格文本
-                                cell_text = ""
-                                if "blocks" in cell:
-                                    for cell_block in cell["blocks"]:
-                                        if cell_block.get("type") == "paragraph" and "elements" in cell_block:
-                                            for elem in cell_block["elements"]:
-                                                if elem.get("type") == "text_run":
-                                                    cell_text += elem.get("text", "")
-                                row_cells.append(cell_text)
-                        rows.append(row_cells)
-                    
-                    if rows:
-                        # 处理表头
-                        headers = rows[0]
-                        markdown += "| " + " | ".join(headers) + " |\n"
-                        markdown += "| " + " | ".join(["---" for _ in headers]) + " |\n"
-                        
-                        # 处理表格内容
-                        for row in rows[1:]:
-                            markdown += "| " + " | ".join(row) + " |\n"
-                        markdown += "\n"
+            elif block_type == 5:  # 标题4
+                text = extract_text(block)
+                markdown += f"#### {text}\n\n"
                 
-            elif block_type == "image":  # 图片
-                if "image" in block:
-                    image = block["image"]
-                    url = image.get("image_token", "")
-                    # 构建图片URL
-                    if url:
-                        image_url = f"https://open.feishu.cn/open-apis/docx/v1/images/{url}/download"
-                        alt = image.get("alt", "图片")
-                        markdown += f"![{alt}]({image_url})\n\n"
+            elif block_type == 6:  # 标题5
+                text = extract_text(block)
+                markdown += f"##### {text}\n\n"
+                
+            elif block_type == 12:  # 无序列表
+                text = extract_text(block)
+                markdown += f"- {text}\n"
+                
+            elif block_type == 13:  # 有序列表
+                text = extract_text(block)
+                markdown += f"1. {text}\n"
+                
+            elif block_type == 27:  # 图片
+                image = block.get("image", {})
+                token = image.get("token", "")
+                if token:
+                    image_url = f"https://open.feishu.cn/open-apis/docx/v1/images/{token}/download"
+                    markdown += f"![图片]({image_url})\n\n"
+                
+            elif block_type == 22:  # 分隔线
+                markdown += "---\n\n"
     
     return markdown
 
